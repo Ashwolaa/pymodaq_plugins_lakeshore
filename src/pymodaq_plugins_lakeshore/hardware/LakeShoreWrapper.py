@@ -48,11 +48,11 @@ class LakeShore340Mixin:
         """
         for ch in self.output_channels:
             if param.name() == f'heater_range_{ch}':
-                output_channel: LakeShoreHeaterChannel = self.controller.outputs[ch]
+                output_channel: LakeShoreHeaterChannel = getattr(self.controller, ch)
                 output_channel.heater_range = param.value()
                 return True
             elif param.name() == f'heater_setpoint_{ch}':
-                output_channel: LakeShoreHeaterChannel = self.controller.outputs[ch]
+                output_channel: LakeShoreHeaterChannel = getattr(self.controller, ch)
                 output_channel.setpoint = param.value()
                 return True
         return False
@@ -78,14 +78,11 @@ class LakeShore340Wrapper(SCPIUnknownMixin, Instrument):
         controller.input['A'].wait_for_temperature()   # Wait for the temperature to stabilize.
         print(controller.input['A'].temperature)       # Print the temperature at sensor A.
     """
-    inputs = {f"input_{ch}": Instrument.ChannelCreator(LakeShoreTemperatureChannel, f'{ch}')  for ch in ['A','B','C','D']}
-    outputs = {f"output_{ch}": Instrument.ChannelCreator(LakeShoreHeaterChannel, f'{ch}')  for ch in [1,]}    
-    # input_A = Instrument.ChannelCreator(LakeShoreTemperatureChannel, 'A')
-    # input_B = Instrument.ChannelCreator(LakeShoreTemperatureChannel, 'B')
-    # input_C = Instrument.ChannelCreator(LakeShoreTemperatureChannel, 'C')
-    # input_D = Instrument.ChannelCreator(LakeShoreTemperatureChannel, 'D')
-    # output_1 = Instrument.ChannelCreator(LakeShoreHeaterChannel, 1)
-    # output_2 = Instrument.ChannelCreator(LakeShoreHeaterChannel, 2)
+    input_A = Instrument.ChannelCreator(LakeShoreTemperatureChannel, 'A')
+    input_B = Instrument.ChannelCreator(LakeShoreTemperatureChannel, 'B')
+    input_C = Instrument.ChannelCreator(LakeShoreTemperatureChannel, 'C')
+    input_D = Instrument.ChannelCreator(LakeShoreTemperatureChannel, 'D')
+    output_1 = Instrument.ChannelCreator(LakeShoreHeaterChannel, 1)
 
     def __init__(self, port, name="Lakeshore Model 340 Temperature Controller", **kwargs):
         kwargs.setdefault('read_termination', "\r\n")
@@ -101,7 +98,9 @@ class LakeShore340Wrapper(SCPIUnknownMixin, Instrument):
         self.adapter.close()
 
 def main():
-    L = LakeShore340Wrapper('COM4')
+    my_port = 'COM4'
+    controller = LakeShore340Wrapper(my_port)
+    controller.close()
 
 
 if __name__ == '__main__':

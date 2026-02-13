@@ -99,7 +99,7 @@ class DAQ_0DViewer_LakeShoreController_340(LakeShore340Mixin, DAQ_Viewer_base):
         active_channels = self.get_active_input_channels()
         data_channels = []
         for ch in active_channels:
-            input_channel: LakeShoreTemperatureChannel = self.controller.inputs[ch]
+            input_channel: LakeShoreTemperatureChannel = getattr(self.controller, ch)
             value = getattr(input_channel, unit)
             data_channels.append(np.array([value]))
 

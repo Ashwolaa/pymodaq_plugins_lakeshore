@@ -46,7 +46,7 @@ class DAQ_Move_LakeShoreController_340(LakeShore340Mixin, DAQ_Move_base):
         -------
         float: The position obtained after scaling conversion.
         """
-        input_channel: LakeShoreTemperatureChannel = self.controller.inputs[self.axis_name]
+        input_channel: LakeShoreTemperatureChannel = getattr(self.controller, self.axis_name)
         value = getattr(input_channel, self.settings.child('output_channels', 'output_units').value())
         pos = DataActuator(data=value)
         pos = self.get_position_with_scaling(pos)
@@ -99,7 +99,7 @@ class DAQ_Move_LakeShoreController_340(LakeShore340Mixin, DAQ_Move_base):
         value: (float) value of the setpoint
         """
         for ch in self.output_channels:
-            output_channel: LakeShoreHeaterChannel = self.controller.outputs[ch]
+            output_channel: LakeShoreHeaterChannel = getattr(self.controller, ch)
             output_channel.setpoint = value.value()
             self.settings.child('output_channels', ch, f'heater_setpoint_{ch}').setValue(value.value())
 
