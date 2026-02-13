@@ -6,22 +6,22 @@ h5exporters = false  # true if plugin contains custom h5 file exporters
 scanners = false  # true if plugin contains custom scan layout (daq_scan extensions)
 
 [urls]
-package-url = 'https://github.com/PyMoDAQ/pymodaq_plugins_template' #todo modify url by your plugin url
+package-url = 'https://github.com/PyMoDAQ/pymodaq_plugins_lakeshore' #todo modify url by your plugin url
 
 [project]
-name = "pymodaq_plugins_template" #todo modify template by your plugin short name
-description = 'some word about your plugin'
+name = "pymodaq_plugins_lakeshore" #todo modify template by your plugin short name
+description = 'Actuator and viewer for lakeshore controller'
 dependencies = [
     "pymodaq>=5.0.0",
-    #todo: list here all dependencies your package may have
+    "pymeasure",    
 ]
 
 authors = [
-    {name = "Name Surname", email = "myname@test.fr"},
+    {name = "Constant Schouder", email = "schouderconstant@outlook.com"},
     #todo: list here all authors of your plugin
 ]
 maintainers = [
-    {name = "Name Surname", email = "myname@test.fr"},
+    {name = "Constant Schouder", email = "schouderconstant@outlook.com"},
     #todo: list here all maintainers of your plugin
 ]
 
@@ -38,10 +38,10 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Natural Language :: English",
     "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Human Machine Interfaces",
     "Topic :: Scientific/Engineering :: Visualization",
     "Topic :: Software Development :: Libraries :: Python Modules",
