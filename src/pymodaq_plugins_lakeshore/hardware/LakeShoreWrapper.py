@@ -2,9 +2,27 @@ from pymeasure.instruments import Instrument
 from pymeasure.instruments.generic_types import SCPIUnknownMixin
 from pymeasure.instruments.lakeshore.lakeshore_base import LakeShoreTemperatureChannel, \
     LakeShoreHeaterChannel
+from pymeasure.instruments.validators import strict_discrete_set
 import serial
 from pymeasure.adapters import SerialAdapter
 from serial.tools.list_ports import comports
+
+
+class LakeShore340HeaterChannel(LakeShoreHeaterChannel):
+    """Heater channel for the LakeShore 340, overriding the range command.
+
+    The 340 uses a global RANGE command (no channel id) with values 0-5.
+    """
+    RANGE_VALUES = {'off': 0, '4 mW': 1, '40 mW': 2, '400 mW': 3, '4 W': 4, '40 W': 5}
+
+    heater_range = Instrument.control(
+        'RANGE?',
+        'RANGE %i',
+        """String property controlling heater range (off, 1-5).""",
+        validator=strict_discrete_set,
+        values=RANGE_VALUES,
+        map_values=True,
+    )
 
 
 class LakeShore340Mixin:
@@ -27,7 +45,7 @@ class LakeShore340Mixin:
         {'title': f'{ch}', 'name': f'{ch}', 'type': 'group', 'children': [
             {'title': f'Heater output {ch}', 'name': f'heater_output_{ch}', 'type': 'int', 'value': 0},
             {'title': f'Heater range {ch}', 'name': f'heater_range_{ch}', 'type': 'list',
-             'limits': ['off', 'low', 'medium', 'high']},
+             'limits': list(LakeShore340HeaterChannel.RANGE_VALUES.keys())},
             {'title': f'Heater setpoint {ch}', 'name': f'heater_setpoint_{ch}', 'type': 'float', 'value': 0},
         ]}
         for ch in output_channels
@@ -48,11 +66,11 @@ class LakeShore340Mixin:
         """
         for ch in self.output_channels:
             if param.name() == f'heater_range_{ch}':
-                output_channel: LakeShoreHeaterChannel = getattr(self.controller, ch)
+                output_channel: LakeShore340HeaterChannel = getattr(self.controller, ch)
                 output_channel.heater_range = param.value()
                 return True
             elif param.name() == f'heater_setpoint_{ch}':
-                output_channel: LakeShoreHeaterChannel = getattr(self.controller, ch)
+                output_channel: LakeShore340HeaterChannel = getattr(self.controller, ch)
                 output_channel.setpoint = param.value()
                 return True
         return False
@@ -82,7 +100,7 @@ class LakeShore340Wrapper(SCPIUnknownMixin, Instrument):
     input_B = Instrument.ChannelCreator(LakeShoreTemperatureChannel, 'B')
     input_C = Instrument.ChannelCreator(LakeShoreTemperatureChannel, 'C')
     input_D = Instrument.ChannelCreator(LakeShoreTemperatureChannel, 'D')
-    output_1 = Instrument.ChannelCreator(LakeShoreHeaterChannel, 1)
+    output_1 = Instrument.ChannelCreator(LakeShore340HeaterChannel, 1)
 
     def __init__(self, port, name="Lakeshore Model 340 Temperature Controller", **kwargs):
         kwargs.setdefault('read_termination', "\r\n")
