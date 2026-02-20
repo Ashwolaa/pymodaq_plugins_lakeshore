@@ -5,6 +5,8 @@ from pymodaq.utils.parameter import Parameter
 from pymeasure.instruments.lakeshore.lakeshore_base import LakeShoreTemperatureChannel, \
     LakeShoreHeaterChannel
 from pymodaq_plugins_lakeshore.hardware.LakeShoreWrapper import LakeShore340Wrapper, LakeShore340Mixin
+from pymodaq_plugins_lakeshore.utils import Config
+config = Config()
 
 
 class DAQ_Move_LakeShoreController_340(LakeShore340Mixin, DAQ_Move_base):
@@ -27,8 +29,8 @@ class DAQ_Move_LakeShoreController_340(LakeShore340Mixin, DAQ_Move_base):
     params = [
         {'title': 'Controller Status:', 'name': 'controller_status', 'type': 'list',
          'value': 'Master', 'limits': ['Master', 'Slave']},
-        {'title': 'COM:', 'name': 'com_port', 'type': 'list',
-         'limits': LakeShore340Mixin.COM_ports},
+        {'title': 'COM', 'name':  'com_port', 'type': 'list', 'limits': config['com_ports'], 'value':config['com_ports'][0] },
+
         {'title': 'Output channels:', 'name': 'output_channels', 'type': 'group', 'children':
          [{'title': 'Output units', 'name': 'output_units', 'type': 'list',
            'limits': LakeShore340Mixin.output_units}]

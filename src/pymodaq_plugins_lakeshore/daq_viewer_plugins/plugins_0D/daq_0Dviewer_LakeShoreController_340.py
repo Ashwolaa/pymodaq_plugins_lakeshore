@@ -7,7 +7,8 @@ from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base, como
 from pymodaq.utils.data import DataFromPlugins
 from pymeasure.instruments.lakeshore.lakeshore_base import LakeShoreTemperatureChannel
 from pymodaq_plugins_lakeshore.hardware.LakeShoreWrapper import LakeShore340Wrapper, LakeShore340Mixin
-
+from pymodaq_plugins_lakeshore.utils import Config
+config = Config()
 
 class DAQ_0DViewer_LakeShoreController_340(LakeShore340Mixin, DAQ_Viewer_base):
     """ Instrument plugin class for reading temperatures from a LakeShore 340 controller.
@@ -22,8 +23,7 @@ class DAQ_0DViewer_LakeShoreController_340(LakeShore340Mixin, DAQ_Viewer_base):
         The wrapper around the LakeShore 340 hardware.
     """
     params = comon_parameters + [
-        {'title': 'COM:', 'name': 'com_port', 'type': 'list',
-         'limits': LakeShore340Mixin.COM_ports},
+        {'title': 'COM', 'name':  'com_port', 'type': 'list', 'limits': config['com_ports'], 'value':config['com_ports'][0] },
         {'title': 'Output units', 'name': 'output_units', 'type': 'list',
          'limits': LakeShore340Mixin.output_units},
         {'title': 'Input channels:', 'name': 'input_channels', 'type': 'group',
@@ -68,7 +68,9 @@ class DAQ_0DViewer_LakeShoreController_340(LakeShore340Mixin, DAQ_Viewer_base):
         self.ini_detector_init(slave_controller=controller)
 
         if self.is_master:
-            self.controller = LakeShore340Wrapper(port=self.settings.child('com_port').value())
+            port ="COM5"
+            # self.controller = LakeShore340Wrapper(port=self.settings.child('com_port').value())
+            self.controller = LakeShore340Wrapper(port=port)
 
         active_channels = self.get_active_input_channels()
         self.dte_signal_temp.emit(DataToExport(
