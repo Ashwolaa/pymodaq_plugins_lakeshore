@@ -1,3 +1,5 @@
+import threading
+
 from pymeasure.instruments import Instrument
 from pymeasure.instruments.generic_types import SCPIUnknownMixin
 from pymeasure.instruments.lakeshore.lakeshore_base import LakeShoreTemperatureChannel, \
@@ -6,6 +8,26 @@ from pymeasure.instruments.validators import strict_discrete_set
 import serial
 from pymeasure.adapters import SerialAdapter
 from serial.tools.list_ports import comports
+
+
+class LockedSerialAdapter(SerialAdapter):
+    """SerialAdapter with a reentrant lock to prevent concurrent serial access from multiple threads."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._comm_lock = threading.RLock()
+
+    def ask(self, command):
+        with self._comm_lock:
+            return super().ask(command)
+
+    def write(self, command):
+        with self._comm_lock:
+            super().write(command)
+
+    def read(self):
+        with self._comm_lock:
+            return super().read()
 
 
 class LakeShore340HeaterChannel(LakeShoreHeaterChannel):
@@ -51,8 +73,33 @@ class LakeShore340Mixin:
         for ch in output_channels
     ]
 
+    # Per-instance flag set during remote sync to prevent echo loops and redundant hardware writes
+    _is_syncing: bool = False
+
+    def register_with_controller(self):
+        """Register this plugin as an observer on the shared controller.
+
+        Must be called after self.controller is assigned in ini_stage / ini_detector.
+        """
+        if hasattr(self.controller, 'register_observer'):
+            self.controller.register_observer(self._sync_setting_from_remote, id(self))
+
+    def _sync_setting_from_remote(self, param_path: tuple, value):
+        """Update local settings when a sibling plugin changes a shared setting.
+
+        Sets _is_syncing so that commit_heater_settings skips the redundant hardware
+        write and the outgoing broadcast, preventing infinite echo loops.
+        """
+        self._is_syncing = True
+        try:
+            self.settings.child(*param_path).setValue(value)
+        except Exception:
+            pass  # param_path may not exist in this plugin (e.g. output_units location differs)
+        finally:
+            self._is_syncing = False
+
     def commit_heater_settings(self, param):
-        """Apply heater-related parameter changes to the hardware.
+        """Apply heater-related parameter changes to the hardware and broadcast to sibling plugins.
 
         Parameters
         ----------
@@ -66,12 +113,22 @@ class LakeShore340Mixin:
         """
         for ch in self.output_channels:
             if param.name() == f'heater_range_{ch}':
-                output_channel: LakeShore340HeaterChannel = getattr(self.controller, ch)
-                output_channel.heater_range = param.value()
+                if not self._is_syncing:
+                    output_channel: LakeShore340HeaterChannel = getattr(self.controller, ch)
+                    output_channel.heater_range = param.value()
+                    self.controller.broadcast_setting(
+                        ('output_channels', ch, f'heater_range_{ch}'),
+                        param.value(), source_id=id(self))
                 return True
             elif param.name() == f'heater_setpoint_{ch}':
-                output_channel: LakeShore340HeaterChannel = getattr(self.controller, ch)
-                output_channel.setpoint = param.value()
+                if not self._is_syncing:
+                    # Skip redundant hardware write when apply_setpoint already did it
+                    if not getattr(self, '_applying_setpoint', False):
+                        output_channel: LakeShore340HeaterChannel = getattr(self.controller, ch)
+                        output_channel.setpoint = param.value()
+                    self.controller.broadcast_setting(
+                        ('output_channels', ch, f'heater_setpoint_{ch}'),
+                        param.value(), source_id=id(self))
                 return True
         return False
 
@@ -104,16 +161,44 @@ class LakeShore340Wrapper(SCPIUnknownMixin, Instrument):
 
     def __init__(self, port, name="Lakeshore Model 340 Temperature Controller", **kwargs):
         kwargs.setdefault('read_termination', "\r\n")
-        port = serial.Serial(port=port, baudrate=9600, dsrdtr=True, bytesize=serial.SEVENBITS, parity=serial.PARITY_ODD, stopbits=serial.STOPBITS_ONE, timeout=1, )
-        adapter = SerialAdapter(port,write_termination='\r\n',read_termination='\r\n',)   
-        super().__init__(
-            adapter,
-            name,
-            **kwargs
-        )
-    def close(self,):
-        # Close connection
+        port = serial.Serial(port=port, baudrate=9600, dsrdtr=True, bytesize=serial.SEVENBITS,
+                             parity=serial.PARITY_ODD, stopbits=serial.STOPBITS_ONE, timeout=1)
+        adapter = LockedSerialAdapter(port, write_termination='\r\n', read_termination='\r\n')
+        super().__init__(adapter, name, **kwargs)
+        self._observers = []
+
+    def register_observer(self, callback, source_id: int):
+        """Register a plugin callback to be notified when a shared setting changes.
+
+        Parameters
+        ----------
+        callback: callable
+            Called as callback(param_path: tuple, value) when a setting changes.
+        source_id: int
+            id() of the registering plugin; used to exclude it from its own broadcasts.
+        """
+        self._observers.append((callback, source_id))
+
+    def broadcast_setting(self, param_path: tuple, value, source_id: int = None):
+        """Notify all registered observers except the source about a setting change.
+
+        Parameters
+        ----------
+        param_path: tuple
+            Path passed to settings.child(*param_path) on the receiving plugin.
+        value:
+            New value of the setting.
+        source_id: int
+            id() of the plugin that triggered the change; it will not receive its own broadcast.
+        """
+        for cb, sid in self._observers:
+            if sid != source_id:
+                cb(param_path, value)
+
+    def close(self):
+        self._observers.clear()
         self.adapter.close()
+
 
 def main():
     my_port = 'COM4'

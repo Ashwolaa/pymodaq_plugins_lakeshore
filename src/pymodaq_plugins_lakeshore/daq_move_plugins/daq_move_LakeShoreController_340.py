@@ -27,10 +27,7 @@ class DAQ_Move_LakeShoreController_340(LakeShore340Mixin, DAQ_Move_base):
     data_actuator_type = DataActuatorType['DataActuator']
 
     params = [
-        {'title': 'Controller Status:', 'name': 'controller_status', 'type': 'list',
-         'value': 'Master', 'limits': ['Master', 'Slave']},
-        {'title': 'COM', 'name':  'com_port', 'type': 'list', 'limits': config['com_ports'], 'value':config['com_ports'][0] },
-
+        {'title': 'COM', 'name':  'com_port', 'type': 'list', 'limits': config['com_ports'], 'value':config['com_ports'][0]},
         {'title': 'Output channels:', 'name': 'output_channels', 'type': 'group', 'children':
          [{'title': 'Output units', 'name': 'output_units', 'type': 'list',
            'limits': LakeShore340Mixin.output_units}]
@@ -40,6 +37,7 @@ class DAQ_Move_LakeShoreController_340(LakeShore340Mixin, DAQ_Move_base):
 
     def ini_attributes(self):
         self.controller: LakeShore340Wrapper = None
+        self._applying_setpoint = False
 
     def get_actuator_value(self):
         """Get the current value from the hardware with scaling conversion.
@@ -81,13 +79,12 @@ class DAQ_Move_LakeShoreController_340(LakeShore340Mixin, DAQ_Move_base):
         initialized: bool
             False if initialization failed otherwise True
         """
-        if self.settings.child('controller_status').value() == "Slave":
-            new_controller = None
-        else:
-            new_controller = LakeShore340Wrapper(port=self.settings.child('com_port').value())
+        self.ini_stage_init(slave_controller=controller)
 
-        self.controller = self.ini_stage_init(old_controller=controller,
-                                              new_controller=new_controller)
+        if self.is_master:
+            self.controller = LakeShore340Wrapper(port=self.settings.child('com_port').value())
+
+        self.register_with_controller()
 
         info = "LakeShore 340 Temperature Controller"
         initialized = bool(self.controller.ask('*IDN?'))
@@ -100,10 +97,16 @@ class DAQ_Move_LakeShoreController_340(LakeShore340Mixin, DAQ_Move_base):
         ----------
         value: (float) value of the setpoint
         """
-        for ch in self.output_channels:
-            output_channel: LakeShoreHeaterChannel = getattr(self.controller, ch)
-            output_channel.setpoint = value.value()
-            self.settings.child('output_channels', ch, f'heater_setpoint_{ch}').setValue(value.value())
+        self._applying_setpoint = True
+        try:
+            for ch in self.output_channels:
+                output_channel: LakeShoreHeaterChannel = getattr(self.controller, ch)
+                output_channel.setpoint = value.value()
+                # setValue triggers commit_heater_settings; _applying_setpoint prevents a double
+                # hardware write there while still allowing the broadcast to the sibling plugin.
+                self.settings.child('output_channels', ch, f'heater_setpoint_{ch}').setValue(value.value())
+        finally:
+            self._applying_setpoint = False
 
     def move_abs(self, value: DataActuator):
         """ Move the actuator to the absolute target defined by value

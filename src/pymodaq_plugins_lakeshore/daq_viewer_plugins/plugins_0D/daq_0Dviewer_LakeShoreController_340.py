@@ -23,7 +23,7 @@ class DAQ_0DViewer_LakeShoreController_340(LakeShore340Mixin, DAQ_Viewer_base):
         The wrapper around the LakeShore 340 hardware.
     """
     params = comon_parameters + [
-        {'title': 'COM', 'name':  'com_port', 'type': 'list', 'limits': config['com_ports'], 'value':config['com_ports'][0] },
+        {'title': 'COM', 'name':  'com_port', 'type': 'list', 'limits': config['com_ports'], 'value':config['com_ports'][0]},
         {'title': 'Output units', 'name': 'output_units', 'type': 'list',
          'limits': LakeShore340Mixin.output_units},
         {'title': 'Input channels:', 'name': 'input_channels', 'type': 'group',
@@ -68,9 +68,9 @@ class DAQ_0DViewer_LakeShoreController_340(LakeShore340Mixin, DAQ_Viewer_base):
         self.ini_detector_init(slave_controller=controller)
 
         if self.is_master:
-            port ="COM5"
-            # self.controller = LakeShore340Wrapper(port=self.settings.child('com_port').value())
-            self.controller = LakeShore340Wrapper(port=port)
+            self.controller = LakeShore340Wrapper(port=self.settings.child('com_port').value())
+
+        self.register_with_controller()
 
         active_channels = self.get_active_input_channels()
         self.dte_signal_temp.emit(DataToExport(
